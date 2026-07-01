@@ -81,6 +81,14 @@ class OpenScribe < Formula
     (bin/"scribe").chmod 0755
   end
 
+  # The app runs inside its own uv-managed venv, and `scribe` invokes that
+  # venv's python by absolute path, so no relocation is needed. Homebrew's
+  # default linkage fixup tries to rewrite the dylib IDs of pre-built wheels
+  # (e.g. jiter) whose Mach-O headers lack padding, which fails. Skip it.
+  def fix_dynamic_linkage
+    # no-op: nothing in libexec/.venv needs its install name rewritten
+  end
+
   def post_install
     puts <<~EOS
       [OK] Open-Scribe installed successfully!
