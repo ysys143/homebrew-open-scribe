@@ -1,8 +1,8 @@
 class OpenScribe < Formula
   desc "YouTube video transcription tool with multiple engines"
   homepage "https://github.com/ysys143/open-scribe"
-  url "https://github.com/ysys143/open-scribe/archive/refs/tags/0.2.0.tar.gz"
-  sha256 "c3bce71c8886c4bd417476eb6476fdc35b26c80802466a044f1ebf94b19b35f5"
+  url "https://github.com/ysys143/open-scribe/archive/refs/tags/0.2.1.tar.gz"
+  sha256 "9f68cf8c81977cca771d46f75028bbbceaab0b71b3dd28bc89b8f2d92ebd794a"
   license "MIT"
 
   depends_on "python@3.11"
@@ -29,6 +29,10 @@ class OpenScribe < Formula
     # Install dependencies using uv
     system "uv", "pip", "install", "--upgrade", "pip", "setuptools", "wheel", "-p", "#{prefix_dir}/.venv"
     system "uv", "pip", "install", "-r", "#{prefix_dir}/requirements.txt", "-p", "#{prefix_dir}/.venv"
+
+    # yt-dlp tracks YouTube's frequent changes; force the newest build past
+    # uv's index cache so a fresh install is never stale.
+    system "uv", "pip", "install", "--upgrade", "--refresh-package", "yt-dlp", "yt-dlp", "-p", "#{prefix_dir}/.venv"
 
     # Create wrapper script.
     # API key setup and .env loading are handled entirely by the app:
@@ -61,16 +65,28 @@ class OpenScribe < Formula
         local CURRENT_VERSION=$(uv pip list -p "$PYTHON_PATH" 2>/dev/null | grep yt-dlp | awk '{print $2}' || echo "not_found")
 
         if [[ "$CURRENT_VERSION" != "not_found" ]]; then
-          local UPDATE_OUTPUT=$(uv pip install --upgrade yt-dlp -p "$PYTHON_PATH" 2>&1)
-          if echo "$UPDATE_OUTPUT" | grep -q "Successfully installed"; then
-            echo "[OK] yt-dlp가 업데이트되었습니다"
+          # --refresh-package bypasses uv's stale index cache so new releases
+          # are actually seen. Decide success by comparing versions, not by
+          # grepping output: uv prints "+ yt-dlp==X", not pip's "Successfully
+          # installed" (the old grep always missed, so updates were skipped).
+          if uv pip install --upgrade --refresh-package yt-dlp yt-dlp -p "$PYTHON_PATH" >/dev/null 2>&1; then
+            local NEW_VERSION=$(uv pip list -p "$PYTHON_PATH" 2>/dev/null | grep yt-dlp | awk '{print $2}')
+            if [[ -n "$NEW_VERSION" && "$NEW_VERSION" != "$CURRENT_VERSION" ]]; then
+              echo "[OK] yt-dlp 업데이트: $CURRENT_VERSION -> $NEW_VERSION"
+            else
+              echo "[OK] yt-dlp 최신 버전: $CURRENT_VERSION"
+            fi
+            # Only stamp the marker on a successful check so a failed run
+            # (e.g. offline) retries next time instead of silently skipping.
+            mkdir -p "$(dirname "$VERSION_CHECK_FILE")"
+            echo "$CURRENT_DATE" > "$VERSION_CHECK_FILE"
           else
-            echo "[OK] yt-dlp가 최신 버전입니다: $CURRENT_VERSION"
+            echo "[WARN] yt-dlp 업데이트 확인 실패 (다음 실행 때 재시도)"
           fi
+        else
+          mkdir -p "$(dirname "$VERSION_CHECK_FILE")"
+          echo "$CURRENT_DATE" > "$VERSION_CHECK_FILE"
         fi
-
-        mkdir -p "$(dirname "$VERSION_CHECK_FILE")"
-        echo "$CURRENT_DATE" > "$VERSION_CHECK_FILE"
       }
 
       # Activate virtualenv
