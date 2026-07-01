@@ -8,6 +8,14 @@ class OpenScribe < Formula
   depends_on "python@3.11"
   depends_on "uv"
 
+  # Rust/maturin wheels bundled in the venv (jiter, pydantic_core) ship an
+  # @rpath LC_ID_DYLIB. Homebrew would rewrite it to a long Cellar path, but
+  # the pre-built .so has no Mach-O header padding, so the rewrite fails and
+  # `brew install` exits non-zero. These are dlopen-ed Python extensions whose
+  # dylib ID is never used for linking, so keep the @rpath ID as-is.
+  # (Requires Homebrew >= 4.6.17.)
+  preserve_rpath
+
   def install
     # Create installation directory
     prefix_dir = libexec
@@ -79,14 +87,10 @@ class OpenScribe < Formula
       exec "#{prefix_dir}/.venv/bin/python" "$ENTRY" "$@"
     EOS
     (bin/"scribe").chmod 0755
-  end
 
-  # The app runs inside its own uv-managed venv, and `scribe` invokes that
-  # venv's python by absolute path, so no relocation is needed. Homebrew's
-  # default linkage fixup tries to rewrite the dylib IDs of pre-built wheels
-  # (e.g. jiter) whose Mach-O headers lack padding, which fails. Skip it.
-  def fix_dynamic_linkage
-    # no-op: nothing in libexec/.venv needs its install name rewritten
+    # Shell-agnostic short alias: `scr` works in any shell via PATH, no zsh/bash
+    # alias needed.
+    bin.install_symlink "scribe" => "scr"
   end
 
   def post_install
