@@ -1,8 +1,8 @@
 class OpenScribe < Formula
   desc "YouTube video transcription tool with multiple engines"
   homepage "https://github.com/ysys143/open-scribe"
-  url "https://github.com/ysys143/open-scribe/archive/refs/tags/0.1.0.tar.gz"
-  sha256 "37721505352e2330974bd6b3ffab43fa692aa22d6349bb4c82c05cc378b4afb9"
+  url "https://github.com/ysys143/open-scribe/archive/refs/tags/0.2.0.tar.gz"
+  sha256 "c3bce71c8886c4bd417476eb6476fdc35b26c80802466a044f1ebf94b19b35f5"
   license "MIT"
 
   depends_on "python@3.11"
@@ -22,7 +22,10 @@ class OpenScribe < Formula
     system "uv", "pip", "install", "--upgrade", "pip", "setuptools", "wheel", "-p", "#{prefix_dir}/.venv"
     system "uv", "pip", "install", "-r", "#{prefix_dir}/requirements.txt", "-p", "#{prefix_dir}/.venv"
 
-    # Create wrapper script with .env initialization
+    # Create wrapper script.
+    # API key setup and .env loading are handled entirely by the app:
+    # src/config.py loads ~/.config/open-scribe/.env (XDG), `scribe --update-key`
+    # rotates the key, and the first run prompts interactively when it is missing.
     bin.mkpath
     (bin/"scribe").write <<~EOS
       #!/bin/bash
@@ -30,59 +33,6 @@ class OpenScribe < Formula
       INSTALL_DIR="#{prefix_dir}"
       ENTRY="${INSTALL_DIR}/main.py"
       VENV_ACTIVATE="${INSTALL_DIR}/.venv/bin/activate"
-      ENV_FILE="$HOME/.open-scribe/.env"
-
-      # Helper function to initialize .env file interactively
-      function _initialize_env() {
-        local ENV_FILE="$1"
-
-        # If .env already exists, don't reinitialize
-        if [[ -f "$ENV_FILE" ]]; then
-          return 0
-        fi
-
-        # If OPENAI_API_KEY is already set via environment, create .env from it
-        if [[ -n "$OPENAI_API_KEY" ]]; then
-          mkdir -p "$(dirname "$ENV_FILE")"
-          {
-            echo "# Open-Scribe Configuration"
-            echo "# Generated on $(date)"
-            echo ""
-            echo "# OpenAI API Key (required for GPT-4o and Whisper API)"
-            echo "OPENAI_API_KEY=$OPENAI_API_KEY"
-          } > "$ENV_FILE"
-          echo "✅ Created $ENV_FILE from OPENAI_API_KEY environment variable"
-          return 0
-        fi
-
-        # Interactive setup
-        echo ""
-        echo "🔧 First time setup: Open-Scribe needs configuration"
-        echo ""
-        echo "OpenAI API Key is required to use transcription features."
-        echo "Get your key at: https://platform.openai.com/api-keys"
-        echo ""
-
-        read -p "Enter your OpenAI API Key (or press Enter to skip): " API_KEY
-
-        if [[ -z "$API_KEY" ]]; then
-          echo "⚠️  Skipped API key setup. You can set it later:"
-          echo "   export OPENAI_API_KEY='your-key-here'"
-          echo "   Or edit: $ENV_FILE"
-          return 0
-        fi
-
-        mkdir -p "$(dirname "$ENV_FILE")"
-        {
-          echo "# Open-Scribe Configuration"
-          echo "# Generated on $(date)"
-          echo ""
-          echo "# OpenAI API Key (required for GPT-4o and Whisper API)"
-          echo "OPENAI_API_KEY=$API_KEY"
-        } > "$ENV_FILE"
-        chmod 600 "$ENV_FILE"
-        echo "✅ Configuration saved to $ENV_FILE"
-      }
 
       # Helper function to check and update yt-dlp
       function _check_and_update_ytdlp() {
@@ -99,16 +49,15 @@ class OpenScribe < Formula
           fi
         fi
 
-        echo "🔍 yt-dlp 버전 확인 중..."
+        echo "[INFO] yt-dlp 버전 확인 중..."
         local CURRENT_VERSION=$(uv pip list -p "$PYTHON_PATH" 2>/dev/null | grep yt-dlp | awk '{print $2}' || echo "not_found")
 
         if [[ "$CURRENT_VERSION" != "not_found" ]]; then
-          echo "📦 yt-dlp 업데이트 확인 중..."
           local UPDATE_OUTPUT=$(uv pip install --upgrade yt-dlp -p "$PYTHON_PATH" 2>&1)
           if echo "$UPDATE_OUTPUT" | grep -q "Successfully installed"; then
-            echo "✅ yt-dlp가 업데이트되었습니다"
+            echo "[OK] yt-dlp가 업데이트되었습니다"
           else
-            echo "✅ yt-dlp가 최신 버전입니다: $CURRENT_VERSION"
+            echo "[OK] yt-dlp가 최신 버전입니다: $CURRENT_VERSION"
           fi
         fi
 
@@ -116,25 +65,17 @@ class OpenScribe < Formula
         echo "$CURRENT_DATE" > "$VERSION_CHECK_FILE"
       }
 
-      # Initialize .env if not exists
-      _initialize_env "$ENV_FILE"
-
-      # Load environment variables from .env
-      if [[ -f "$ENV_FILE" ]]; then
-        export $(grep -v '^#' "$ENV_FILE" | xargs)
-      fi
-
       # Activate virtualenv
       if [[ -f "$VENV_ACTIVATE" ]]; then
         source "$VENV_ACTIVATE"
       fi
 
-      # Check and update yt-dlp if URL is provided
+      # Check and update yt-dlp if a URL is provided
       if [[ $# -gt 0 && ("$1" == http://* || "$1" == https://*) ]]; then
         _check_and_update_ytdlp "$INSTALL_DIR/.venv"
       fi
 
-      # Run transcription
+      # Run transcription (the app manages the API key and .env itself)
       exec "#{prefix_dir}/.venv/bin/python" "$ENTRY" "$@"
     EOS
     (bin/"scribe").chmod 0755
@@ -142,13 +83,15 @@ class OpenScribe < Formula
 
   def post_install
     puts <<~EOS
-      ✅ Open-Scribe installed successfully!
+      [OK] Open-Scribe installed successfully!
 
       To get started:
         scribe "https://www.youtube.com/watch?v=VIDEO_ID"
 
-      On first run, you'll be prompted for your OpenAI API Key.
+      On first run you'll be prompted for your OpenAI API Key, which is
+      stored securely at ~/.config/open-scribe/.env.
       Get your key at: https://platform.openai.com/api-keys
+      Rotate it later with: scribe --update-key
 
       Options:
         scribe "URL" --engine whisper-api --summary
