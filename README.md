@@ -1,43 +1,32 @@
 # homebrew-open-scribe
 
-Homebrew Tap for [Open-Scribe](https://github.com/jaesolshin/open-scribe) - YouTube video transcription tool.
+Homebrew Tap for [Open-Scribe](https://github.com/ysys143/open-scribe).
 
-## Installation
-
-```bash
-brew tap jaesolshin/homebrew-open-scribe
+```sh
+brew tap ysys143/open-scribe
 brew install open-scribe
+scr --version
+scr config show
+scr config validate
+scr ls
 ```
 
-## Usage
+Version 0.3.0 uses `~/.config/open-scribe/settings.json` for general settings.
+Old `.env` option defaults are not loaded. Set `copy_to_path` explicitly if copies are desired.
+Reference existing credential files in JSON; key values are never stored in JSON or initialized by the wrapper.
+See the [upgrade notes](https://github.com/ysys143/open-scribe/releases/tag/0.3.0).
 
-```bash
-# Basic usage
-scribe "https://www.youtube.com/watch?v=VIDEO_ID"
-
-# With options
-scribe "URL" --engine whisper-api --summary
-scribe "URL" --timestamp --srt
-scribe "PLAYLIST_URL" --parallel 4
-```
-
-On first run, you'll be prompted for your OpenAI API Key.
-
-## Update
-
-```bash
+```sh
+scr "https://youtu.be/VIDEO_ID"
+scr "/path/to/audio.wav" --no-summary
+scr ls 20
 brew upgrade open-scribe
 ```
 
-## Uninstall
+The default Scribe v2 model uses OpenRouter. Existing engines remain available through `--engine`.
+The JSON example is installed under the formula's libexec directory.
 
-```bash
+```sh
 brew uninstall open-scribe
-brew untap jaesolshin/homebrew-open-scribe
+brew untap ysys143/open-scribe
 ```
-
-## About
-
-This is the official Homebrew Tap for [Open-Scribe](https://github.com/jaesolshin/open-scribe).
-
-For more information, visit the [main repository](https://github.com/jaesolshin/open-scribe).
