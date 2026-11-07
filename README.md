@@ -11,10 +11,10 @@ scr config validate
 scr ls
 ```
 
-Version 0.3.0 uses `~/.config/open-scribe/settings.json` for general settings.
+Version 0.3.1 uses `~/.config/open-scribe/settings.json` for general settings.
 Old `.env` option defaults are not loaded. Set `copy_to_path` explicitly if copies are desired.
 Reference existing credential files in JSON; key values are never stored in JSON or initialized by the wrapper.
-See the [upgrade notes](https://github.com/ysys143/open-scribe/releases/tag/0.3.0).
+See the [upgrade notes](https://github.com/ysys143/open-scribe/releases/tag/0.3.1).
 
 ```sh
 scr "https://youtu.be/VIDEO_ID"
@@ -30,3 +30,5 @@ The JSON example is installed under the formula's libexec directory.
 brew uninstall open-scribe
 brew untap ysys143/open-scribe
 ```
+
+Scribe v2 now defaults to ElevenLabs direct API. Configure ELEVENLABS_API_KEY with Speech to Text permission through an explicit key-file reference.
